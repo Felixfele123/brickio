@@ -40,7 +40,14 @@ const userSchema = new mongoose.Schema({
     },
     rank: {
         type: Number,
-    }
+    },
+    xp: {
+        type: Number,
+    },
+    coins: {
+        type: Number,
+    },
+    
   });
   
 const User = new mongoose.model('User', userSchema, 'users');
@@ -263,7 +270,9 @@ app.post("/regConfirmation", (req,res)=>{
                             email: verifiedToken.email,
                             username: verifiedToken.username,
                             level: 1,
-                            rank: 1
+                            rank: 1,
+                            xp: 0,
+                            coins: 0,
                         })
                                 newUser.save( async function(err){
                                     if (err) throw err;
@@ -292,6 +301,49 @@ app.post("/regConfirmation", (req,res)=>{
         res.send("no cookie provided")
     }
 });
+
+app.post("/updateUserdata", async(req, res)=>{
+    let token = req.cookies.token
+    let xpIncrease = parseInt(req.body.xp)
+    let coinIncrease = parseInt(req.body.coins)
+    if(token){
+        let verifiedToken = jwt.verify(token,process.env.MAINSECRET);
+        let useremail = verifiedToken.email
+        try {
+            let userdata = await User.find(
+                {email: useremail})
+                res.send(userdata)
+                
+                let totalXp = userdata[0].xp + xpIncrease
+                let potens = userdata[0].level - 1
+                let topXp = Math.floor(Math.pow(1.3, potens) * 1000)
+                if(totalXp > topXp){
+                    let remainingXp = totalXp - topXp
+                    console.log(remainingXp)
+                    await User.update({email: useremail}, {$inc:{level:1, coins:coinIncrease}, xp: remainingXp})  
+                    console.log("success")                  
+                }else{
+                    await User.update( {email: useremail}, {$inc:{xp:xpIncrease, coins:coinIncrease}})
+                    console.log("success")
+                }
+           /* await User.update(
+                {email: useremail}, {$inc:{xp:xpIncrease}})
+            
+                
+                let xpTop = 1000 * Math.pow(1.3, userdata[0].level)
+                if(userdata[0].xp > xpTop){
+                    await User.update(
+                        {email: useremail}, {$inc:{level:1}, xp: remainingXp}) 
+                }*/
+        } catch (ex) {
+            for(field in ex.errors){
+                console.log(ex.errors[field])
+            }
+        }
+    }else{
+        res.send('no token')
+    }
+})
 
 
 
