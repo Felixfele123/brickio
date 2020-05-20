@@ -10,6 +10,9 @@ const validator = require("email-validator");
 const nodeMailer = require('nodemailer')
 const socket = require('socket.io')
 
+mongoose.set('useNewUrlParser', true);
+mongoose.set('useFindAndModify', false);
+mongoose.set('useCreateIndex', true);
 
 app.use(express.urlencoded({extended:true}));
 app.use(express.json());
@@ -75,7 +78,7 @@ app.post('/login', async (req, res) =>{
                 
                 let payload = {email:email, username:username, hash:hash};
                 
-                let token = jwt.sign(payload,process.env.FIRSTSECRET,{expiresIn:120});
+                let token = jwt.sign(payload,process.env.FIRSTSECRET,{expiresIn:12000});
                     
                 res.cookie("tmpToken", token, {maxAge: 120000, samsite:"strict", httpOnly:true});
                 res.cookie("createUser",true,{maxAge:7200000});
@@ -119,21 +122,20 @@ app.post('/login', async (req, res) =>{
 });
 
 app.get("/userdata", async (req,res)=>{
-    let token = req.cookies.token
+    try {
+     let token = req.cookies.token
     if(token){
         let verifiedToken = jwt.verify(token,process.env.MAINSECRET);
         let useremail = verifiedToken.email
-        try {
             const userdata = await User.find({email: useremail})
             res.send(userdata)
-        } catch (ex) {
-            for(field in ex.errors){
-                console.log(ex.errors[field])
-            }
-        }
     }else{
         res.send('no token')
-    }   
+    }         
+    } catch (error) {
+        console.log(error)
+    }
+ 
 });
 
 app.post("/confirmation", (req,res)=>{
@@ -157,11 +159,11 @@ app.post("/confirmation", (req,res)=>{
                     res.cookie("token",token,{maxAge:720000000, httpOnly: true, samsite: "Strict"});
                     
                     // Cookie som endast är intressantför Klienten....
-                    res.cookie("vueCheck",true,{maxAge:7200000});
+                    res.cookie("vueCheck",true,{maxAge:720000000});
                     
                     // spara användare i databas...
                     let userdata = await User.find({email:verifiedToken.email})
-                    res.cookie("user", userdata,{maxAge:7200000})
+                    res.cookie("user", userdata,{maxAge:720000000})
 
                     res.send(userdata)
                     
@@ -361,21 +363,112 @@ app.get("/logout", (req,res) => {
     }
 
 
-const server = app.listen(3456, () => console.log("port 3456"))
+const server = app.listen(3456, () => console.log("port 3456"));
+
+
 
 var io = socket(server, { origins: '*:*'}); 
 
+/*class Player {
+    constructor(id, username, x){
+        this.id = id
+        this.username = username
+        this.x = x
+        this.lastUpdateTime = Date.now();
 
-
-
-
+    }
+    setXpos(x){
+        this.x = x
+    }
+    serializeForUpdate(){
+        return{
+            x: this.x,
+            id: this.id,
+            t: Date.now()
+        }
+    }
+}
+class Game {
+    constructor(){
+        this.sockets = {}
+        this.players = {}
+        setInterval(this.update.bind(this), 1000 / 0.1);
+    }
+    handleInput(data,socket){
+        if (this.players[socket.id]) {
+            this.players[socket.id].setXpos(data);
+          }
+    }
+    addPlayer(socket, username){
+        this.sockets[socket.id] = socket
+        const x = 200
+        this.players[socket.id] = new Player(socket.id, username, x);
+        console.log('added player')
+        console.log(this.players)
+    }
+    removePlayer(socket) {
+        delete this.sockets[socket.id];
+        delete this.players[socket.id];
+        console.log(this.players)
+      }
+    update(){
+        Object.keys(this.sockets).forEach(playerID => {
+            const socket = this.sockets[playerID];
+            const player = this.players[playerID];
+            socket.emit('GAME_UPDATE', this.createUpdate(player));
+          });
+    }
+    createUpdate(){
+        let update = []
+        Object.keys(this.players).forEach(element => {
+            update.push(this.players[element].serializeForUpdate())
+        });
+        return update
+    }
+}
 
 io.on("connection", socket => {
-    // console.log('sid=', socket.id);
-  
     socket.on("SEND_MESSAGE", data => {
       io.emit("MESSAGE", data);
-      console.log(data)
     });
   });
 
+/*io.on("connection", socket => {
+    console.log('sid=', socket.id);
+
+    socket.on("SEND_GAMEREQUEST", data => {
+        joinGame(socket, data)
+    });
+    socket.on("LEAVE_GAME", disconnect);
+    socket.on("SEND_MESSAGE", data => {
+      io.emit("MESSAGE", data);
+    });
+    socket.on("SEND_MOUSEPOS", data => {
+      handleInout(data, socket)
+    });
+  });
+const game = new Game();
+
+function joinGame(socket, data){
+    game.addPlayer(socket, data.userID);
+}
+
+function disconnect(){
+    game.removePlayer(this)
+}
+
+function handleInout(data, socket){
+    game.handleInput(data, socket)
+}
+
+function sendGamerequest(data){
+    for(i = 0; i < players.length; i++){
+        if(players[i].userID == null){
+            players[i].userID = data.userID;
+            io.emit("SESSION_ID", players[i].id);
+            console.log(players)
+            break;
+        }    
+    }
+}
+*/
